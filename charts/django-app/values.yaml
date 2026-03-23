@@ -1,0 +1,20 @@
+image:
+  repository: 122610492747.dkr.ecr.eu-central-1.amazonaws.com/final-project-ecr
+  pullPolicy: IfNotPresent
+  tag: v1.0.2
+
+service:
+  type: LoadBalancer
+  port: 8000
+
+hpa:
+  minReplicas: 2
+  maxReplicas: 6
+  targetCPUUtilizationPercentage: 70
+
+config:
+  POSTGRES_PORT: 5432
+  POSTGRES_HOST: db
+  POSTGRES_USER: django_user
+  POSTGRES_DB: django_db
+  POSTGRES_PASSWORD: pass9764gd
