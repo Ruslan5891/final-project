@@ -131,3 +131,10 @@ module "rds" {
     Project     = "myapp"
   }
 }
+
+module "monitoring" {
+  source       = "./modules/monitoring"
+  namespace    = "monitoring"
+  chart_version = "75.10.0"
+  depends_on   = [module.eks]
+}

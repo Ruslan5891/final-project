@@ -7,26 +7,27 @@
 ## Структура проєкту
 
 ```text
-lesson-db-module/
+final-project/
 ├── main.tf               # Головний файл, підключення всіх модулів
 ├── backend.tf            # Налаштування бекенду для стейтів (S3 + DynamoDB)
 ├── outputs.tf            # Загальні виводи ресурсів
 ├── variables.tf          # Кореневі змінні
 ├── modules/
     ├── s3-backend/       # S3 + DynamoDB для зберігання Terraform state
-    ├── vpc/              # VPC, підмережі, маршрути, Internet Gateway, NAT
+    ├── vpc/              # VPC, підмережі, маршрути, Internet Gateway
     ├── ecr/              # ECR репозиторій для Docker-образів
     ├── eks/              # EKS кластер та node group
     ├── jenkins/          # Jenkins, встановлений через Helm
     └── argo_cd/          # Argo CD + Helm-чарт з Application'ами
     └── rds/              # RDS Модуль бази даних або aurora кластера
+    └── monitoring/       # Prometheus + Grafana (kube-prometheus-stack)
 
 ```
 
 ### Огляд модулів
 
 - **`modules/s3-backend`** – створює S3-бакет з версіонуванням для `terraform.tfstate` та таблицю DynamoDB для блокування стейту.
-- **`modules/vpc`** – формує мережеву інфраструктуру (VPC, публічні/приватні підмережі, Internet Gateway, NAT, таблиці маршрутів).
+- **`modules/vpc`** – формує мережеву інфраструктуру (VPC, публічні/приватні підмережі, Internet Gateway, таблиці маршрутів).
 - **`modules/ecr`** – створює репозиторій **ECR** для зберігання Docker-образів (`final-project-ecr`).
 - **`modules/eks`** – підіймає керований кластер **Amazon EKS**, node group та IAM-ролі (в т.ч. для доступу до ECR).
 - **`modules/jenkins`** – розгортає **Jenkins** у namespace `jenkins` через Helm, додає:
@@ -35,9 +36,10 @@ lesson-db-module/
   - service account `jenkins-sa` з IAM-роллю для Kaniko (доступ до ECR);
   - Helm release `jenkins` з JCasC-конфігурацією (seed-job, креденшели GitHub).
 - **`modules/argo_cd`** – розгортає **Argo CD** (Helm release `argo_cd`) та окремий Helm-чарт з:
-  - ArgoCD `Application`, який слідкує за репозиторієм `devops_test` (`charts/django-app`);
+  - ArgoCD `Application`, який слідкує за репозиторієм `final-project` (`charts/django-app`);
   - `Secret` типу `repository` для підключення GitHub-репозиторію.
 - **`modules/rds`** – підіймає базу данних по типу **PostgreSQL** або більш швидку базу aurora
+- **`modules/monitoring`** – встановлює **kube-prometheus-stack** (Prometheus + Grafana) у namespace `monitoring`
 
 ---
 
@@ -54,11 +56,11 @@ lesson-db-module/
 ### Крок 1. Ініціалізація
 
 ```bash
-cd lesson-db-module
+cd final-project
 terraform init
 ```
 
-**Що відбувається:** завантажуються провайдери (`aws`, `kubernetes`, `helm`) та ініціалізуються модулі (`s3-backend`, `vpc`, `ecr`, `eks`, `jenkins`, `argo_cd`, `rds`).
+**Що відбувається:** завантажуються провайдери (`aws`, `kubernetes`, `helm`) та ініціалізуються модулі (`s3-backend`, `vpc`, `ecr`, `eks`, `jenkins`, `argo_cd`, `rds`, `monitoring`).
 
 ### Крок 2. Планування
 
@@ -130,13 +132,13 @@ Jenkins налаштований через **Jenkins Configuration as Code (JCa
 
 - створює credential `github-token` для доступу до GitHub;
 - створює seed-job, який генерує pipeline job для репозиторію:
-  - `https://github.com/Ruslan5891/devops_test`
+  - `https://github.com/Ruslan5891/final-project`
 
-У результаті в UI Jenkins з’являється pipeline (наприклад, `goit-django-docker`), який працює з репозиторієм `devops_test`.
+У результаті в UI Jenkins з’являється pipeline (наприклад, `goit-django-docker`), який працює з репозиторієм `final-project`.
 
 ### Логіка Jenkins pipeline
 
-`Jenkinsfile` лежить у репозиторії `devops_test` і містить дві основні стадії:
+`Jenkinsfile` лежить у репозиторії `final-project` і містить дві основні стадії:
 
 1. **Build & Push Docker Image**
    - запускається Kubernetes-агент з контейнерами:
@@ -149,18 +151,18 @@ Jenkins налаштований через **Jenkins Configuration as Code (JCa
      - тег: `v1.0.${BUILD_NUMBER}` (унікальний для кожного білду).
 
 2. **Update Chart Tag in Git**
-   - клонування репозиторію `devops_test`;
+   - клонування репозиторію `final-project`;
    - перехід до `charts/django-app/values.yaml`;
    - оновлення рядка `tag: ...` на новий тег образу (`IMAGE_TAG`);
    - `git add`, `git commit`, `git push` у гілку `main`.
 
 **Результат:**  
-кожний успішний запуск pipeline створює новий тег образу в ECR і оновлює Helm values-файл у Git (`devops_test`).
+кожний успішний запуск pipeline створює новий тег образу в ECR і оновлює Helm values-файл у Git (`final-project`).
 
 ### Де подивитися оновлений образ і тег
 
 - **AWS ECR консоль** – репозиторій `final-project-ecr` (регіон `eu-central-1`), список тегів: `v1.0.X`.
-- **GitHub `devops_test`** – файл `charts/django-app/values.yaml`, поле `image.tag` міститиме останній тег.
+- **GitHub `final-project`** – файл `charts/django-app/values.yaml`, поле `image.tag` міститиме останній тег.
 
 ### Налаштування в інтерфейсі Jenkins
 
@@ -179,7 +181,7 @@ Argo CD розгорнуто в namespace `argocd`.
 kubectl get svc -n argocd
 ```
 
-Сервіс `argocd-server` налаштовано як `LoadBalancer` (див. `modules/argo_cd/values.yaml`), тому UI доступний за:
+Сервіс Argo CD налаштовано як `LoadBalancer` (див. `modules/argo_cd/values.yaml`). Точну назву сервісу можна подивитися командою `kubectl get svc -n argocd`, а UI відкрийте за `EXTERNAL-IP/hostname`:
 
 ```text
 https://<ARGOCD_LOADBALANCER_IP>
@@ -196,11 +198,11 @@ kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath="{.data.pas
 - користувач: `admin`
 - пароль: значення з команди вище.
 
-### Argo CD Application, що слідкує за `devops_test`
+### Argo CD Application, що слідкує за `final-project`
 
 У `modules/argo_cd/charts/values.yaml` описане Application з такими параметрами:
 
-- `repoURL`: `https://github.com/Ruslan5891/devops_test`
+- `repoURL`: `https://github.com/Ruslan5891/final-project`
 - `path`: `charts/django-app`
 - `targetRevision`: `main`
 - `syncPolicy.automated` з `prune: true` та `selfHeal: true`
@@ -208,14 +210,14 @@ kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath="{.data.pas
 
 **Що це дає:**
 
-- Argo CD постійно слідкує за гілкою `main` у `devops_test`;
+- Argo CD постійно слідкує за гілкою `main` у `final-project`;
 - кожне оновлення `values.yaml` (новий тег образу від Jenkins) автоматично призводить до синхронізації Helm-чарту в кластері EKS.
 
 ### Як перевірити, що Argo CD оновив реліз
 
 1. Відкрити Argo CD UI та знайти Application (наприклад, `example-app`).
 2. Переконатися, що статус `Synced` і `Healthy`.
-3. Відкрити вкладку **History** й побачити новий sync, який відповідає останньому коміту Jenkins у `devops_test`.
+3. Відкрити вкладку **History** й побачити новий sync, який відповідає останньому коміту Jenkins у `final-project`.
 4. Додатково перевірити в кластері:
 
 ```bash
@@ -224,6 +226,36 @@ kubectl describe deployment <release-name>-django -n default
 ```
 
 У полі `Image` в `describe deployment` ви побачите оновлений тег образу (`final-project-ecr:v1.0.X`) з ECR.
+
+---
+
+## Перевірка моніторингу: Prometheus та Grafana
+
+Моніторинг встановлюється через Helm-чарт `kube-prometheus-stack` у namespace `monitoring`.
+
+1. Перевірити, що компоненти піднялись:
+```bash
+kubectl get all -n monitoring
+kubectl get svc -n monitoring | grep -E "grafana|prometheus"
+```
+
+2. Grafana:
+```bash
+kubectl port-forward svc/kube-prometheus-stack-grafana 3000:80 -n monitoring
+```
+Після цього відкрий у браузері: `http://localhost:3000`
+
+Логін: `admin`  
+Пароль дістаньте з secret:
+```bash
+kubectl -n monitoring get secret kube-prometheus-stack-grafana -o jsonpath='{.data.admin-password}' | base64 -d; echo
+```
+
+3. Prometheus:
+```bash
+kubectl port-forward svc/kube-prometheus-stack-prometheus 9090:9090 -n monitoring
+```
+Після цього відкрий у браузері: `http://localhost:9090`
 
 ---
 
@@ -399,11 +431,7 @@ module "rds" {
 
 Якщо інфраструктура більше не потрібна:
 
-1. **Видаліть реліз застосунку (якщо використовували локальний Helm-чарт):**
-
-```bash
-helm uninstall <назва-релізу> -n default
-```
+1. **(Опціонально) Приберіть застосунки через Argo CD UI** (наприклад, видалення Application `example-app`). Це необов'язково, якщо ви все одно робите `terraform destroy`, але так швидше прибрати ресурси додатку.
 
 2. **Видаліть ECR-репозиторій з образами:**
 
@@ -411,10 +439,10 @@ helm uninstall <назва-релізу> -n default
 aws ecr delete-repository --repository-name final-project-ecr --force --region eu-central-1
 ```
 
-3. **Знищіть решту інфраструктури через Terraform:**
+3. **Видаліть решту інфраструктури через Terraform:**
 
 ```bash
-cd lesson-db-module
+cd final-project
 terraform destroy
 ```
 
@@ -422,4 +450,5 @@ terraform destroy
 
 - якщо в S3-бакеті залишилися файли стейту, видалення бакета може впасти з помилкою;
 - у такому разі зайдіть у консоль S3, виконайте **Empty** для бакета, а потім видаліть його;
-- переконайтеся, що всі платні ресурси (NAT Gateway, VPC, ECR тощо) видалені, щоб уникнути зайвих нарахувань.
+- якщо `terraform destroy` зупиняється на видаленні Aurora/RDS через final snapshot, видаліть snapshot в AWS (ідентифікатор: `<db-ім'я>-final-snapshot`, у вашому випадку `myapp-db-final-snapshot`) і запустіть `terraform destroy` ще раз.
+- переконайтеся, що всі платні ресурси (VPC, ECR тощо) видалені, щоб уникнути зайвих нарахувань.

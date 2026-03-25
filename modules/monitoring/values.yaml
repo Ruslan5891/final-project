@@ -1,0 +1,15 @@
+grafana:
+  # Ensure the chart deploys at least a couple of dashboards so you can
+  defaultDashboardsEnabled: true
+
+  sidecar:
+    dashboards:
+      enabled: true
+      # ConfigMap label key used by kube-prometheus-stack Grafana sidecar
+      label: grafana_dashboard
+      # ConfigMap label value used by kube-prometheus-stack Grafana sidecar
+      labelValue: "1"
+      # Search dashboards in all namespaces (we create none ourselves here,
+      # so the chart's stock dashboards are enough for the task).
+      searchNamespace: ALL
+

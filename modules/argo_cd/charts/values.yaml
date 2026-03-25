@@ -3,7 +3,7 @@ applications:
     namespace: default
     project: default
     source:
-      repoURL: https://github.com/Ruslan5891/devops_test
+      repoURL: https://github.com/Ruslan5891/final-project
       path: charts/django-app
       targetRevision: main
       helm:
@@ -19,9 +19,9 @@ applications:
 
 repositories:
   - name: example-app
-    url: https://github.com/Ruslan5891/devops_test
+    url: https://github.com/Ruslan5891/final-project
     username:
-    password:
+    password: 
 
 repoConfig:
   insecure: "true"

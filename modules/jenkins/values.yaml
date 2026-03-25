@@ -44,7 +44,7 @@ controller:
                       scope: GLOBAL
                       id: github-token
                       username:
-                      password:
+                      password: 
                       description: GitHub PAT
       seed-job: |
         jobs:
@@ -54,7 +54,7 @@ controller:
                 scm {
                   git {
                     remote {
-                      url('https://github.com/Ruslan5891/devops_test')
+                      url('https://github.com/Ruslan5891/final-project')
                       credentials('github-token')
                     }
                     branches('*/main')
@@ -69,12 +69,13 @@ controller:
                             scm {
                               git {
                                 remote {
-                                  url("https://github.com/Ruslan5891/devops_test")
+                                  url("https://github.com/Ruslan5891/final-project")
                                   credentials("github-token")
                                 }
                                 branches("*/main")
                               }
                             }
+                            scriptPath("Django/Jenkinsfile")
                           }
                         }
                       }
